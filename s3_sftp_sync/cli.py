@@ -143,27 +143,31 @@ def main(config_file, logging_config):
         sftp.walktree('.', wtcb.file_cb, wtcb.dir_cb, wtcb.unk_cb, True)
 
         for fname in wtcb.flist:
-            stats = sftp.sftp_client.stat(fname)
+
+            #Remove ./ from name, that character are part of the name
+            slicedName = fname[2:]
+            stats = sftp.sftp_client.stat(slicedName)
 
             mtime = str(stats.st_mtime)
             size = stats.st_size
             if start_time == None or mtime >= start_time:
-                with sftp.sftp_client.file(fname) as file:
+                with sftp.sftp_client.file(slicedName) as file:
                     if mtime == start_time:
-                        s3_hash = s3_md5(s3, bucket, key_prefix + fname)
+                        s3_hash = s3_md5(s3, bucket, key_prefix + slicedName)
 
                         # if s3 object doesn't exist, don't bother hashing sftp file
                         if s3_hash != None:
-                            print('{} modified time equals start_time, hash checking file'.format(fname))
+                            print('{} modified time equals start_time, hash checking file'.format(slicedName))
                             file_hash = file_md5(file)
                         else:
                             file_hash = None
                     if start_time == None or mtime > start_time or s3_hash != file_hash:
-                        print('Syncing {} - {} mtime - {} bytes'.format(fname, mtime, size))
+                        print('Syncing {} - {} mtime - {} bytes'.format(slicedName, mtime, size))
+
 
                         s3.put_object(
                             Bucket=bucket,
-                            Key=key_prefix + fname,
+                            Key=key_prefix + slicedName,
                             Body=file,
                             Metadata={
                                 'sftp_mtime': mtime,
